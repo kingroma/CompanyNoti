@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mydefault.app.noti.serviceimpl.NotiMapper">
+	<!--	<![CDATA[, ]]>	-->
+	
+	<select id="list" resultType="NotiVO">
+		SELECT * FROM T_NOTI
+	</select>
+	
+	<insert id="insert">
+		<selectKey keyProperty="notiId" resultType="String" order="BEFORE">
+			SELECT CONCAT('NOTI_' , LPAD(IFNULL(COUNT(NOTI_ID),0) + 1 ,4,'0')) FROM T_NOTI
+		</selectKey>
+		INSERT INTO T_NOTI (
+			NOTI_ID ,
+			NOTI_TITLE ,
+			NOTI_NICK_NAME , 
+			NOTI_DE ,
+			NOTI_TEXT 
+		) VALUES ( 
+			#{notiId},
+			#{notiTitle},
+			#{notiNickName},
+			#{notiDe},
+			#{notiText}
+		)
+	</insert>
+	
+	<insert id="update">
+		<!-- <selectKey keyProperty="notiId" resultType="String" order="BEFORE">
+			SELECT CONCAT('NOTI_' , LPAD(IFNULL(COUNT(NOTI_ID),0) + 1 ,4,'0')) FROM T_NOTI
+		</selectKey> -->
+		INSERT INTO T_NOTI (
+			NOTI_ID ,
+			NOTI_TITLE ,
+			NOTI_NICK_NAME , 
+			NOTI_DE ,
+			NOTI_TEXT 
+		) VALUES ( 
+			#{notiId},
+			'asd' , 
+			IFNULL(#{notiNickName},'asd ') , 
+			IFNULL(#{notiDe},'asd ') , 
+			IFNULL(#{notiText},'asd ') 
+		)
+	</insert>
+	
+</mapper>

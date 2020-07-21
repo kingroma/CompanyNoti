@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mydefault.app.common.mydaemon.serviceimpl.MyDaemonMapper">
+	<!--	<![CDATA[, ]]>	-->
+	<select id='list' resultType="MyDaemonVO">
+		SELECT 
+			CAST(@rownum:=@rownum+1 AS UNSIGNED ) AS ROWNUM, 
+			A.* 
+			
+			FROM (
+				SELECT 
+					
+				    D.DAEMON_ID , 
+				    D.DAEMON_NM , 
+				    D.DAEMON_TEXT , 
+				    D.CONTROLLER_NM , 
+				    D.INTERVAL_AT , 
+				    ( CASE WHEN D.INTERVAL_AT = 'Y' THEN '반복' ELSE '일회' END  ) AS INTERVAL_AT_NM , 
+				    D.MINUTE , 
+		            (
+						CONCAT(
+							Floor( D.MINUTE / 60 )  , '시 ' ,
+		                    Floor( D.MINUTE % 60 )  , '분 ' 
+		                ) 
+		                
+					)  AS MINUTE_EVERY_DAY_TIME ,   
+				    D.BGNDE , 
+		            DATE_FORMAT(D.BGNDE , "%Y-%m-%d") AS BGNDE_FORMAT , 
+				    D.ENDDE ,
+		            ( CASE 
+						WHEN D.ENDDE = '99991231' THEN '영구' 
+		                ELSE DATE_FORMAT(D.ENDDE , "%Y-%m-%d") 
+					END ) AS ENDDE_FORMAT , 
+				    D.USE_AT ,
+		            (CASE WHEN D.USE_AT = 'Y' THEN '사용' ELSE '미사용' END) AS USE_AT_NM 
+				    
+				FROM TB_MY_DAEMON D
+				WHERE (@rownum:=0)=0 AND D.DEL_AT != 'Y'
+				ORDER BY D.DAEMON_ID 
+			) A
+	</select>
+	
+	<select id='view' resultType="MyDaemonVO">
+		SELECT 
+		    D.DAEMON_ID , 
+		    D.DAEMON_NM , 
+		    D.DAEMON_TEXT , 
+		    D.CONTROLLER_NM , 
+		    D.DAEMON_PARAM ,
+		    D.INTERVAL_AT , 
+		    ( CASE WHEN D.INTERVAL_AT = 'Y' THEN '반복' ELSE '일회' END  ) AS INTERVAL_AT_NM , 
+		    D.MINUTE , 
+            (
+				CONCAT(
+					Floor( D.MINUTE / 60 ) , '시 ' ,
+                    Floor( D.MINUTE % 60 ) , '분 ' 
+                ) 
+                
+			)  AS MINUTE_EVERY_DAY_TIME ,   
+		    D.BGNDE , 
+            DATE_FORMAT(D.BGNDE , "%Y-%m-%d") AS BGNDE_FORMAT , 
+		    D.ENDDE ,
+            ( CASE 
+				WHEN D.ENDDE = '99991231TEST' THEN '영구' 
+                ELSE DATE_FORMAT(D.ENDDE , "%Y-%m-%d") 
+			END ) AS ENDDE_FORMAT , 
+		    D.USE_AT ,
+            (CASE WHEN D.USE_AT = 'Y' THEN '사용' ELSE '미사용' END) AS USE_AT_NM 
+		    
+		FROM TB_MY_DAEMON D
+		WHERE DAEMON_ID = #{daemonId} AND D.DEL_AT != 'Y'
+	</select>
+	
+	<insert id="insert">
+		<selectKey keyProperty="daemonId" resultType="String" order="BEFORE">
+			SELECT CONCAT('DAEMON_' , LPAD(IFNULL(COUNT(DAEMON_ID),0) + 1,4,'0')) FROM TB_MY_DAEMON
+		</selectKey>
+		INSERT INTO TB_MY_DAEMON (
+			DAEMON_ID , 
+			DAEMON_NM , 
+			DAEMON_TEXT , 
+			CONTROLLER_NM , 
+			DAEMON_PARAM ,
+			
+			INTERVAL_AT ,
+			MINUTE , 
+			BGNDE , 
+			ENDDE , 
+			
+			USE_AT ,
+			DEL_AT 
+		) VALUES (
+			#{daemonId} , 
+			#{daemonNm} , 
+			IFNULL(#{daemonText} ,''), 
+			#{controllerNm} , 
+			#{daemonParam} ,
+			
+			#{intervalAt} ,
+			#{minute} , 
+			REPLACE(#{bgnde} ,'-','') , 
+			REPLACE(#{endde} ,'-','') , 
+			
+			#{useAt} ,
+			#{delAt}
+		)
+	</insert>
+
+	<update id='update'>
+		UPDATE TB_MY_DAEMON SET
+			DAEMON_NM = #{daemonNm} , 
+			DAEMON_TEXT = IFNULL(#{daemonText} ,'') , 
+			CONTROLLER_NM = #{controllerNm} ,
+			DAEMON_PARAM = #{daemonParam} ,  
+			INTERVAL_AT = #{intervalAt} ,
+			
+			MINUTE = #{minute} , 
+			BGNDE = REPLACE(#{bgnde} ,'-','') , 
+			ENDDE = REPLACE(#{endde} ,'-','') , 
+			
+			USE_AT = #{useAt} , 
+			DEL_AT = #{delAt}
+		WHERE DAEMON_ID = #{daemonId}
+	</update>
+
+	<select id='duplPk' resultType='Integer'>
+		SELECT COUNT(*) FROM TB_MY_DAEMON WHERE DAEMON_ID = #{daemonId};
+	</select>
+	
+	<insert id='insertBatchLog'>
+		<selectKey keyProperty="sortSn" resultType="String" order="BEFORE">
+			SELECT 	CONCAT(DATE_FORMAT(NOW(),'%Y%m%d'), '_' , COUNT(*) + 1 ) FROM TB_MY_DAEMON_LOG 
+			WHERE DAEMON_ID = #{daemonId} AND SORT_SN LIKE CONCAT(DATE_FORMAT(NOW(),'%Y%m%d') , '_%' );
+		</selectKey>
+		INSERT INTO TB_MY_DAEMON_LOG (
+			DAEMON_ID , 
+			SORT_SN , 
+			START_DT ,
+			SUCC_AT , 
+			MESSAGE 
+		) VALUES (
+			#{daemonId} , 
+			#{sortSn} , 
+			NOW() , 
+			#{succAt} , 
+			IFNULL(#{message},'')
+		)
+	</insert>
+	
+	<update id='updateBatchLog'>
+		UPDATE TB_MY_DAEMON_LOG
+			SET 
+				END_DT = NOW() ,
+				SUCC_AT = #{succAt} ,
+				MESSAGE = #{message} 
+		WHERE DAEMON_ID = #{daemonId} AND SORT_SN = #{sortSn}
+	</update>
+	
+	<select id='dashboardMonth' resultType="MyMap">
+		SELECT 
+			IFNULL(ROUND(( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(NOW() , '%Y%m')) * 100 / A.TOTAL ),0) AS SUCC,
+				
+			IFNULL(ROUND(( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'N' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(NOW() , '%Y%m')) * 100 / A.TOTAL ),0) AS FAIL
+                
+			FROM (
+	            SELECT
+					( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) AS TOTAL
+					
+				FROM TB_MY_DAEMON_LOG
+				WHERE 
+					DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(NOW() , '%Y%m') AND
+					 ( SUCC_AT = 'N' OR SUCC_AT = 'Y' ) 
+            ) A
+	</select>
+	
+	<select id='dashboardSixMonth' resultType="MyMap">
+		SELECT 
+			IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(NOW() , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(NOW() , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' )) * 100 ) ,0) AS PER1 ,
+			
+			DATE_FORMAT(NOW() , '%M') AS M1 ,
+			
+		    IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH) , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH) , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' ) ) * 100 ),0) AS PER2 ,
+			
+			DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 MONTH)  , '%M') AS M2 ,
+			
+		    IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -2 MONTH) , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -2 MONTH) , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' ) ) * 100 ),0) AS PER3 ,
+			
+			DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -2 MONTH)  , '%M') AS M3 ,
+			
+		    IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -3 MONTH) , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -3 MONTH) , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' ) ) * 100 ),0) AS PER4 ,
+		    
+		    DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -3 MONTH)  , '%M') AS M4 ,
+		        
+			IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -4 MONTH) , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -4 MONTH) , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' ) ) * 100 ),0) AS PER5 ,
+		    
+		    DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -4 MONTH)  , '%M') AS M5 ,
+		        
+			IFNULL(ROUND( ( SELECT
+				COUNT(*) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				SUCC_AT = 'Y' AND
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH) , '%Y%m') ) / 
+			( SELECT
+				( CASE WHEN COUNT(*) = 0 THEN 1 ELSE COUNT(*) END ) 
+				
+			FROM TB_MY_DAEMON_LOG
+			WHERE 
+				DATE_FORMAT(START_DT , '%Y%m') = DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH) , '%Y%m') AND (SUCC_AT = 'Y' OR SUCC_AT = 'N' ) ) * 100 ),0) AS PER6 ,
+				
+			DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -5 MONTH)  , '%M') AS M6 
+	</select>
+	
+	<update id='delete'>
+		UPDATE TB_MY_DAEMON SET
+			 
+			DEL_AT = 'Y'
+		WHERE DAEMON_ID = #{daemonId}
+	</update>
+</mapper>
